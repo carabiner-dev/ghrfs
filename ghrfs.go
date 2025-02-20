@@ -39,11 +39,11 @@ func New(optFns ...optFunc) (*ReleaseFileSystem, error) {
 		}
 	}
 
-	return NewWithOptions(opts)
+	return NewWithOptions(&opts)
 }
 
 // NewWithOptions takes an options set and return a new RFS
-func NewWithOptions(opts Options) (*ReleaseFileSystem, error) {
+func NewWithOptions(opts *Options) (*ReleaseFileSystem, error) {
 	c, err := github.NewClient()
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func NewWithOptions(opts Options) (*ReleaseFileSystem, error) {
 	c.Options.Host = opts.Host
 
 	rfs := &ReleaseFileSystem{
-		Options: opts,
+		Options: *opts,
 		client:  c,
 	}
 
@@ -93,7 +93,6 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 			releaseURLMask, rfs.Options.Organization, rfs.Options.Repository, rfs.Options.Tag,
 		), nil,
 	)
-
 	if err != nil {
 		return fmt.Errorf("loading release: %w", err)
 	}
