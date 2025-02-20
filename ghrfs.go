@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/carabiner-dev/github"
+	"github.com/nozzle/throttler"
 )
 
 const (
@@ -206,7 +208,10 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	return rfs.Release.Assets[i], nil
 }
 
-// CacheRelease caches
+// CacheRelease downloads `ParallelDownloads` assets at a time and caches them
+// in `Options.CachePath`. Each asset file's data stream is copied to a local
+// file. If assets already have a DataStream defined, it is reused for copying
+// and it will be closed to be replaced by the new local file when it is used.
 func (rfs *ReleaseFileSystem) CacheRelease() error {
 	if rfs.Options.CachePath == "" {
 		return errors.New("release cache path not specified")
@@ -220,5 +225,41 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 	if err := json.NewEncoder(f).Encode(rfs.Release); err != nil {
 		return fmt.Errorf("encoding release data: %w", err)
 	}
+
+	// Now copy the file data to the local cache
+	t := throttler.New((rfs.Options.ParallelDownloads), len(rfs.Release.Assets))
+	for _, a := range rfs.Release.Assets {
+		go func() {
+			var src fs.File
+			var err error
+			if a.DataStream != nil {
+				src = a
+			} else {
+				src, err = rfs.OpenRemoteFile(a.Name())
+				if err != nil {
+					t.Done(err)
+					return
+				}
+			}
+
+			dst, err := os.Create(filepath.Join(rfs.Options.CachePath, a.Name()))
+			if err != nil {
+				t.Done(err)
+				return
+			}
+
+			if _, err := io.Copy(dst, src); err != nil {
+				t.Done(err)
+				return
+			}
+			a.DataStream.Close()
+			a.DataStream = nil
+
+			t.Done(nil)
+		}()
+		t.Throttle()
+	}
+	rfs.Options.Cache = true
+
 	return nil
 }

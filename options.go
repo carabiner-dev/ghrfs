@@ -24,8 +24,9 @@ type Options struct {
 
 // Default options
 var defaultOptions = Options{
-	Host:  githubAPIURL,
-	Cache: false,
+	Host:              githubAPIURL,
+	Cache:             false,
+	ParallelDownloads: 3,
 }
 
 const releasePathPattern = `/([A-Za-z0-9-_\.]+)/([A-Za-z0-9-_\.]+)/releases/tag/(\S+)`
