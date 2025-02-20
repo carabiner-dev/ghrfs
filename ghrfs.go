@@ -19,7 +19,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/carabiner-dev/github"
@@ -27,7 +26,7 @@ import (
 )
 
 const (
-	releaseURLMask  = `/repos/%s/%s/releases/tags/%ss`
+	releaseURLMask  = `repos/%s/%s/releases/tags/%s`
 	githubAPIURL    = "api.github.com"
 	releaseDataFile = ".release-data.json"
 )
@@ -50,10 +49,17 @@ func NewWithOptions(opts Options) (*ReleaseFileSystem, error) {
 		return nil, err
 	}
 	c.Options.Host = opts.Host
-	return &ReleaseFileSystem{
+
+	rfs := &ReleaseFileSystem{
 		Options: opts,
 		client:  c,
-	}, nil
+	}
+
+	if err := rfs.LoadRelease(); err != nil {
+		return nil, fmt.Errorf("loading release: %w", err)
+	}
+
+	return rfs, nil
 }
 
 // Ensure RFS implements fs.FS
@@ -123,7 +129,7 @@ func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
 	// Check if the asset file has its data stream already open
 	i, ok := rfs.Release.fileIndex[name]
 	if !ok {
-		return nil, fs.ErrNotExist
+		return nil, fmt.Errorf("opening %q: %w", name, fs.ErrNotExist)
 	}
 	if rfs.Release.Assets[i].DataStream != nil {
 		return rfs.Release.Assets[i], nil
@@ -141,7 +147,7 @@ func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
 func (rfs *ReleaseFileSystem) OpenCachedFile(name string) (fs.File, error) {
 	i, ok := rfs.Release.fileIndex[name]
 	if !ok {
-		return nil, fs.ErrNotExist
+		return nil, fmt.Errorf("opening %q: %w", name, fs.ErrNotExist)
 	}
 	if !rfs.Options.Cache {
 		return nil, fmt.Errorf("unable to open file, release is not cached")
@@ -183,7 +189,7 @@ func getClientForURL(urlString string) (*github.Client, error) {
 func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	i, ok := rfs.Release.fileIndex[name]
 	if !ok {
-		return nil, fs.ErrNotExist
+		return nil, fmt.Errorf("opening %q: %w", name, fs.ErrNotExist)
 	}
 
 	if rfs.Release.Assets[i].URL == "" {
@@ -197,9 +203,9 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	}
 
 	// Send the request to the API
-	resp, err := rfs.client.Call(
+	resp, err := c.Call(
 		context.Background(), "GET",
-		strings.TrimPrefix(rfs.Release.Assets[i].URL, "https://"+c.Options.Host), nil,
+		rfs.Release.Assets[i].URL, nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("requesting file from API: %w", err)
