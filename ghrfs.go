@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2025 Carabiner Systems, Inc
 // SPDX-License-Identifier: Apache-2.0
 
-// Package ghrfs (short ffor GitHub Release File System) is an fs.FS implementation
+// Package ghrfs (short for GitHub Release File System) is an fs.FS implementation
 // that reads data from a GitHub release.
 //
 // ghrfs can read directly from GitHub's API or cache a release locally for
@@ -24,13 +24,18 @@ import (
 	"github.com/carabiner-dev/github"
 )
 
-const releaseURLMask = `/repos/%s/%s/releases/tags/%ss`
-const githubAPIURL = "api.github.com"
+const (
+	releaseURLMask  = `/repos/%s/%s/releases/tags/%ss`
+	githubAPIURL    = "api.github.com"
+	releaseDataFile = ".release-data.json"
+)
 
 func New(optFns ...optFunc) (*ReleaseFileSystem, error) {
 	opts := defaultOptions
 	for _, fn := range optFns {
-		fn(&opts)
+		if err := fn(&opts); err != nil {
+			return nil, err
+		}
 	}
 
 	return NewWithOptions(opts)
@@ -143,6 +148,25 @@ func (rfs *ReleaseFileSystem) OpenCachedFile(name string) (fs.File, error) {
 	return rfs.Release.Assets[i], nil
 }
 
+// getClientForURL returns a github client configured for the hostname
+// of a URL.
+func getClientForURL(urlString string) (*github.Client, error) {
+	// The download URL from the assets is not on the same host as
+	// the API, so we need a new client
+	u, err := url.Parse(urlString)
+	if err != nil {
+		return nil, fmt.Errorf("parsing asset URL: %w", err)
+	}
+
+	// Request the file using a client with the asset URL
+	c, err := github.NewClient()
+	if err != nil {
+		return nil, err
+	}
+	c.Options.Host = u.Hostname()
+	return c, nil
+}
+
 // OpenRemoteFile returns the asset file connected to its data stream
 func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	i, ok := rfs.Release.fileIndex[name]
@@ -154,19 +178,11 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 		return nil, fmt.Errorf("no url found in asset data")
 	}
 
-	// The download URL from the assets is not on the same host as
-	// the API, so we need a new client
-	u, err := url.Parse(rfs.Release.Assets[i].URL)
-	if err != nil {
-		return nil, fmt.Errorf("parsing asset URL: %w", err)
-	}
-
-	// Request the file using a client with the asset URL
-	c, err := github.NewClient()
+	// Assets are not downloaded from the API, we need a new client
+	c, err := getClientForURL(rfs.Release.Assets[i].URL)
 	if err != nil {
 		return nil, err
 	}
-	c.Options.Host = u.Hostname()
 
 	// Send the request to the API
 	resp, err := rfs.client.Call(
@@ -182,5 +198,17 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 
 // CacheRelease caches
 func (rfs *ReleaseFileSystem) CacheRelease() error {
-	return errors.New("Not yet")
+	if rfs.Options.CachePath == "" {
+		return errors.New("release cache path not specified")
+	}
+	// Cache the release data into a JSON file
+	f, err := os.Create(filepath.Join(rfs.Options.CachePath, releaseDataFile))
+	if err != nil {
+		return fmt.Errorf("creating release data file: %w", err)
+	}
+
+	if err := json.NewEncoder(f).Encode(rfs.Release); err != nil {
+		return fmt.Errorf("encoding release data: %w", err)
+	}
+	return nil
 }
