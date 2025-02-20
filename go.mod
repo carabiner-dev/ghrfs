@@ -1,6 +1,6 @@
 module github.com/carabiner-dev/ghrfs
 
-go 1.24
+go 1.23.4
 
 require (
 	github.com/carabiner-dev/github v0.0.0-20250210222226-442fdacc1d16
