@@ -13,12 +13,13 @@ type optFunc func(*Options) error
 
 // Options is the configuration struct for the github FS
 type Options struct {
-	Host         string
-	Organization string
-	Repository   string
-	Cache        bool
-	CachePath    string
-	Tag          string
+	Cache             bool
+	ParallelDownloads int
+	Host              string
+	Organization      string
+	Repository        string
+	CachePath         string
+	Tag               string
 }
 
 // Default options
@@ -100,6 +101,13 @@ func WithCache(useCache bool) optFunc {
 func WithCachePath(path string) optFunc {
 	return func(opts *Options) error {
 		opts.CachePath = path
+		return nil
+	}
+}
+
+func WithParallelDownloads(dl int) optFunc {
+	return func(opts *Options) error {
+		opts.ParallelDownloads = dl
 		return nil
 	}
 }
