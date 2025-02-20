@@ -118,6 +118,16 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 
 // Open opens a file.
 func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
+	// Check if the asset file has its data stream already open
+	i, ok := rfs.Release.fileIndex[name]
+	if !ok {
+		return nil, fs.ErrNotExist
+	}
+	if rfs.Release.Assets[i].DataStream != nil {
+		return rfs.Release.Assets[i], nil
+	}
+
+	// Otherwise open it
 	if rfs.Options.Cache {
 		return rfs.OpenCachedFile(name)
 	}
