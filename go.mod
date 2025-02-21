@@ -5,7 +5,7 @@ go 1.23.4
 require (
 	github.com/carabiner-dev/github v0.0.0-20250210222226-442fdacc1d16
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
