@@ -2,6 +2,8 @@ module github.com/carabiner-dev/ghrfs
 
 go 1.23.4
 
+toolchain go1.24.0
+
 require (
 	github.com/carabiner-dev/github v0.0.0-20250210222226-442fdacc1d16
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
