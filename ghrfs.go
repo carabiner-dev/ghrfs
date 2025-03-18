@@ -126,7 +126,6 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 }
 
 func (rfs *ReleaseFileSystem) Stat(name string) (fs.FileInfo, error) {
-	fmt.Printf("Stat on %s\n", name)
 	if name == "." || name == "/" {
 		return FileInfo{
 			IName:  rfs.Release.Tag,
@@ -159,7 +158,6 @@ func (rfs *ReleaseFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
 
 // Open opens a file.
 func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
-	fmt.Printf("open on %s\n", name)
 	if name == "." {
 		assets := []fs.DirEntry{}
 		for _, f := range rfs.Release.Assets {
@@ -249,8 +247,6 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Printf("opening %s\n", rfs.Release.Assets[i].URL)
 
 	// Send the request to the API
 	resp, err := c.Call(
