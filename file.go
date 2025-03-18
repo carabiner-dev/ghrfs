@@ -32,12 +32,21 @@ func (af *AssetFile) Stat() (fs.FileInfo, error) {
 	return af.FileInfo, nil
 }
 
+func (af *AssetFile) Info() (fs.FileInfo, error) {
+	return af.FileInfo, nil
+}
+
+func (af *AssetFile) Type() fs.FileMode {
+	return af.Mode()
+}
+
 // FileInfo captures the asset information and implements fs.FileInfo
 type FileInfo struct {
-	IName string    `json:"name"` // base name of the file
-	ISize int64     `json:"size"` // length in bytes for regular files; system-dependent for others
-	Ctime time.Time `json:"created_at"`
-	Mtime time.Time `json:"updated_at"`
+	IName  string    `json:"name"` // base name of the file
+	ISize  int64     `json:"size"` // length in bytes for regular files; system-dependent for others
+	Ctime  time.Time `json:"created_at"`
+	Mtime  time.Time `json:"updated_at"`
+	IIsDir bool      `json:"isdir"`
 }
 
 // Name base name of the file
@@ -52,6 +61,9 @@ func (afd FileInfo) Size() int64 {
 
 // Mode file mode bits
 func (afd FileInfo) Mode() fs.FileMode {
+	if afd.IIsDir {
+		return fs.ModeDir
+	}
 	return fs.FileMode(0o0400)
 }
 
@@ -62,7 +74,7 @@ func (afd FileInfo) ModTime() time.Time {
 
 // IsDir: abbreviation for Mode().IsDir()
 func (afd FileInfo) IsDir() bool {
-	return false
+	return afd.IIsDir
 }
 
 func (afd FileInfo) Sys() any {

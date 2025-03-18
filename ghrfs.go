@@ -64,6 +64,7 @@ func NewWithOptions(opts *Options) (*ReleaseFileSystem, error) {
 
 // Ensure RFS implements fs.FS
 var _ fs.FS = (*ReleaseFileSystem)(nil)
+var _ fs.StatFS = (*ReleaseFileSystem)(nil)
 
 // ReleaseFileSystem implements fs.FS by reading data a GitHub release.
 type ReleaseFileSystem struct {
@@ -123,8 +124,41 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 	return nil
 }
 
+func (rfs *ReleaseFileSystem) Stat(name string) (fs.FileInfo, error) {
+	fmt.Printf("Stat on %s\n", name)
+	if name == "." || name == "/" {
+		return FileInfo{
+			IName:  rfs.Release.Tag,
+			ISize:  0,
+			Ctime:  rfs.Release.PublishedAt,
+			Mtime:  rfs.Release.PublishedAt,
+			IIsDir: true,
+		}, nil
+	}
+	i, ok := rfs.Release.fileIndex[name]
+	if !ok {
+		return nil, fmt.Errorf("opening %q: %w", name, fs.ErrNotExist)
+	}
+
+	return rfs.Release.Assets[i], nil
+}
+
 // Open opens a file.
 func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
+	fmt.Printf("open on %s\n", name)
+	if name == "." {
+		assets := []fs.DirEntry{}
+		for _, f := range rfs.Release.Assets {
+			assets = append(assets, f)
+		}
+		return &ReleaseDir{
+			Tag:        rfs.Release.Tag,
+			Ctime:      rfs.Release.PublishedAt,
+			Mtime:      rfs.Release.PublishedAt,
+			AssetFiles: assets,
+		}, nil
+	}
+
 	// Check if the asset file has its data stream already open
 	i, ok := rfs.Release.fileIndex[name]
 	if !ok {
