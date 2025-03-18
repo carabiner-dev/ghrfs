@@ -65,6 +65,7 @@ func NewWithOptions(opts *Options) (*ReleaseFileSystem, error) {
 // Ensure RFS implements fs.FS
 var _ fs.FS = (*ReleaseFileSystem)(nil)
 var _ fs.StatFS = (*ReleaseFileSystem)(nil)
+var _ fs.ReadDirFS = (*ReleaseFileSystem)(nil)
 
 // ReleaseFileSystem implements fs.FS by reading data a GitHub release.
 type ReleaseFileSystem struct {
@@ -141,6 +142,19 @@ func (rfs *ReleaseFileSystem) Stat(name string) (fs.FileInfo, error) {
 	}
 
 	return rfs.Release.Assets[i], nil
+}
+
+// ReadDir implements readddir fs
+func (rfs *ReleaseFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
+	// The only "dir" we support is the root, which is the release itself
+	if name != "." && name != "/" {
+		return nil, fs.ErrNotExist
+	}
+	ret := []fs.DirEntry{}
+	for _, f := range rfs.Release.Assets {
+		ret = append(ret, f)
+	}
+	return ret, nil
 }
 
 // Open opens a file.
