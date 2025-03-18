@@ -176,11 +176,12 @@ func getClientForURL(urlString string) (*github.Client, error) {
 	}
 
 	// Request the file using a client with the asset URL
-	c, err := github.NewClient()
+	c, err := github.NewClient(
+		github.WithHost(u.Hostname()),
+	)
 	if err != nil {
 		return nil, err
 	}
-	c.Options.Host = u.Hostname()
 	return c, nil
 }
 
@@ -192,7 +193,7 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	}
 
 	if rfs.Release.Assets[i].URL == "" {
-		return nil, fmt.Errorf("no url found in asset data")
+		return nil, fmt.Errorf("no URL found in asset data")
 	}
 
 	// Assets are not downloaded from the API, we need a new client
@@ -200,6 +201,8 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("opening %s\n", rfs.Release.Assets[i].URL)
 
 	// Send the request to the API
 	resp, err := c.Call(

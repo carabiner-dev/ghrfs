@@ -5,7 +5,7 @@ go 1.23.7
 toolchain go1.24.0
 
 require (
-	github.com/carabiner-dev/github v0.1.1
+	github.com/carabiner-dev/github v0.2.0
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
 	github.com/stretchr/testify v1.10.0
 )
@@ -24,6 +24,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/thlib/go-timezone-local v0.0.0-20210907160436-ef149e42d28e // indirect
+	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
