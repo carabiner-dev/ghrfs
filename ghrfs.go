@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -90,11 +89,21 @@ type ReleaseData struct {
 // LoadRelease queries the GitHub API and loads the release data,
 // optionally catching the assets
 func (rfs *ReleaseFileSystem) LoadRelease() error {
+	// Use the stock release endpoint
+	releaseURL := fmt.Sprintf(
+		releaseURLMask, rfs.Options.Organization, rfs.Options.Repository, rfs.Options.Tag,
+	)
+
+	// ...unless we're targetting the latest one, which is different:
+	if rfs.Options.Tag == "" || rfs.Options.Tag == "latest" {
+		releaseURL = fmt.Sprintf(
+			"repos/%s/%s/releases/latest", rfs.Options.Organization, rfs.Options.Repository,
+		)
+	}
+
+	// Call the API to get the data
 	resp, err := rfs.client.Call(
-		context.Background(), http.MethodGet,
-		fmt.Sprintf(
-			releaseURLMask, rfs.Options.Organization, rfs.Options.Repository, rfs.Options.Tag,
-		), nil,
+		context.Background(), "GET", releaseURL, nil,
 	)
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
 		return fmt.Errorf("HTTP error %d when getting release data", resp.StatusCode)
