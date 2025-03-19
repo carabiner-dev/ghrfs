@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -90,11 +91,14 @@ type ReleaseData struct {
 // optionally catching the assets
 func (rfs *ReleaseFileSystem) LoadRelease() error {
 	resp, err := rfs.client.Call(
-		context.Background(), "GET",
+		context.Background(), http.MethodGet,
 		fmt.Sprintf(
 			releaseURLMask, rfs.Options.Organization, rfs.Options.Repository, rfs.Options.Tag,
 		), nil,
 	)
+	if resp.StatusCode > 399 || resp.StatusCode < 200 {
+		return fmt.Errorf("HTTP error %d when getting release data", resp.StatusCode)
+	}
 	if err != nil {
 		return fmt.Errorf("loading release: %w", err)
 	}
