@@ -18,6 +18,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Set tag output
         id: tag
@@ -40,12 +42,12 @@ jobs:
       - name: Generate SBOM
         shell: bash
         run: |
-          bom generate --format=json -o /tmp/${{github.event.repository.name}}-${{ steps.tag.outputs.tag_name }}.spdx.json .
+          bom generate --format=json -o /tmp/${{github.event.repository.owner}}-${{github.event.repository.name}}-${{ steps.tag.outputs.tag_name }}.spdx.json .
 
       - name: Publish Release
         uses: kubernetes-sigs/release-actions/publish-release@a69972745f85aab4ba5d6c681e2a0e7f73eaff2b # v0.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          assets: "/tmp/${{github.event.repository.name}}-${{ steps.tag.outputs.tag_name }}.spdx.json"
+          assets: "/tmp/${{github.event.repository.owner}}-${{github.event.repository.name}}-${{ steps.tag.outputs.tag_name }}.spdx.json"
           sbom: false
