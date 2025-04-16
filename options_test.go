@@ -10,6 +10,7 @@ import (
 )
 
 func TestFromURL(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		input   string

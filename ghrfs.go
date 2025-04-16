@@ -63,9 +63,11 @@ func NewWithOptions(opts *Options) (*ReleaseFileSystem, error) {
 }
 
 // Ensure RFS implements fs.FS
-var _ fs.FS = (*ReleaseFileSystem)(nil)
-var _ fs.StatFS = (*ReleaseFileSystem)(nil)
-var _ fs.ReadDirFS = (*ReleaseFileSystem)(nil)
+var (
+	_ fs.FS        = (*ReleaseFileSystem)(nil)
+	_ fs.StatFS    = (*ReleaseFileSystem)(nil)
+	_ fs.ReadDirFS = (*ReleaseFileSystem)(nil)
+)
 
 // ReleaseFileSystem implements fs.FS by reading data a GitHub release.
 type ReleaseFileSystem struct {
@@ -94,7 +96,7 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 		releaseURLMask, rfs.Options.Organization, rfs.Options.Repository, rfs.Options.Tag,
 	)
 
-	// ...unless we're targetting the latest one, which is different:
+	// ...unless we're targeting the latest one, which is different:
 	if rfs.Options.Tag == "" || rfs.Options.Tag == "latest" {
 		releaseURL = fmt.Sprintf(
 			"repos/%s/%s/releases/latest", rfs.Options.Organization, rfs.Options.Repository,
@@ -111,11 +113,11 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 	if err != nil {
 		return fmt.Errorf("loading release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	data := ReleaseData{}
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&data); err != nil {
+	if err := dec.Decode(&data); err != nil { //nolint:musttag
 		return fmt.Errorf("unmarshaling release data: %w", err)
 	}
 	rfs.Release = data
@@ -287,6 +289,7 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 		return fmt.Errorf("creating release data file: %w", err)
 	}
 
+	//nolint:musttag
 	if err := json.NewEncoder(f).Encode(rfs.Release); err != nil {
 		return fmt.Errorf("encoding release data: %w", err)
 	}
@@ -317,7 +320,7 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 				t.Done(err)
 				return
 			}
-			a.DataStream.Close()
+			a.DataStream.Close() //nolint:errcheck,gosec
 			a.DataStream = nil
 
 			t.Done(nil)

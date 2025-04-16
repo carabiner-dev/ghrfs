@@ -27,7 +27,7 @@ func TestCacheRelease(t *testing.T) {
 
 				f1, err := os.Create(filepath.Join(o.CachePath, "src-test1.txt"))
 				require.NoError(t, err)
-				_, err = f1.Write([]byte("test1"))
+				_, err = f1.WriteString("test1")
 				require.NoError(t, err)
 				_, err = f1.Seek(0, 0)
 				require.NoError(t, err)
@@ -39,7 +39,7 @@ func TestCacheRelease(t *testing.T) {
 
 				f2, err := os.Create(filepath.Join(o.CachePath, "src-test2.txt"))
 				require.NoError(t, err)
-				_, err = f2.Write([]byte("test2"))
+				_, err = f2.WriteString("test2")
 				require.NoError(t, err)
 				_, err = f2.Seek(0, 0)
 				require.NoError(t, err)

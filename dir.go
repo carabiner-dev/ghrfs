@@ -15,7 +15,6 @@ type ReleaseDir struct {
 	Ctime      time.Time
 	Mtime      time.Time
 	AssetFiles []fs.DirEntry
-	//FileInfo
 }
 
 func (rd *ReleaseDir) Close() error {
