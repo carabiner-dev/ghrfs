@@ -62,7 +62,7 @@ func main() {
 
 	// Do something with the file:
 	fmt.Printf("  %s atrributes:\n  %+v\n", info.Name(), info)
-	fmt.Println("\nTest File Contents:\n") //nolint:govet
+	fmt.Print("\nTest File Contents:\n\n")
 	if _, err := io.Copy(os.Stdout, file); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
