@@ -20,8 +20,12 @@ type AssetFile struct {
 	FileInfo
 }
 
+// Close implements the Close method for the file. After closing, the response
+// stream is niled out to cause a re-fetch if there is another call to open/read.
 func (af *AssetFile) Close() error {
-	return af.DataStream.Close()
+	af.DataStream.Close() //nolint:errcheck,gosec
+	af.DataStream = nil
+	return nil
 }
 
 func (af *AssetFile) Read(p []byte) (int, error) {
