@@ -19,6 +19,8 @@ type Options struct {
 	Organization      string
 	Repository        string
 	CachePath         string
+	CacheMaxSize      int64
+	CacheExtensions   []string
 	Tag               string
 }
 
@@ -109,6 +111,20 @@ func WithCachePath(path string) optFunc {
 func WithParallelDownloads(dl int) optFunc {
 	return func(opts *Options) error {
 		opts.ParallelDownloads = dl
+		return nil
+	}
+}
+
+func WithCacheMaxSize(size int64) optFunc {
+	return func(opts *Options) error {
+		opts.CacheMaxSize = size
+		return nil
+	}
+}
+
+func WithCacheExtensions(exts []string) optFunc {
+	return func(opts *Options) error {
+		opts.CacheExtensions = exts
 		return nil
 	}
 }

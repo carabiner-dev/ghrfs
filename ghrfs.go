@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/carabiner-dev/github"
@@ -219,6 +220,10 @@ func (rfs *ReleaseFileSystem) OpenCachedFile(name string) (fs.File, error) {
 
 	f, err := os.Open(filepath.Join(rfs.Options.CachePath, name))
 	if err != nil {
+		// If the file was not found, open the remote file
+		if errors.Is(err, os.ErrNotExist) {
+			return rfs.OpenRemoteFile(name)
+		}
 		return nil, fmt.Errorf("opening cached file: %w", err)
 	}
 
@@ -283,6 +288,7 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 	if rfs.Options.CachePath == "" {
 		return errors.New("release cache path not specified")
 	}
+
 	// Cache the release data into a JSON file
 	f, err := os.Create(filepath.Join(rfs.Options.CachePath, releaseDataFile))
 	if err != nil {
@@ -298,6 +304,23 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 	t := throttler.New((rfs.Options.ParallelDownloads), len(rfs.Release.Assets))
 	for _, a := range rfs.Release.Assets {
 		go func() {
+			// Check if the options have preferences for max size or extensions
+			// to cache. If unmatched, the asset will note be cached but it will
+			// be pulled remotely if needed.
+
+			// Skip if over max size
+			if rfs.Options.CacheMaxSize > 0 && rfs.Options.CacheMaxSize < a.Size() {
+				t.Done(nil)
+				return
+			}
+
+			// Skip if extensions are defined but the file ext is not one of them
+			if len(rfs.Options.CacheExtensions) > 0 && filepath.Ext(a.Name()) != "" &&
+				!slices.Contains(rfs.Options.CacheExtensions, filepath.Ext(a.Name())) {
+				t.Done(nil)
+				return
+			}
+
 			var src fs.File
 			var err error
 			if a.DataStream != nil {
