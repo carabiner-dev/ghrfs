@@ -285,8 +285,13 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 // file. If assets already have a DataStream defined, it is reused for copying
 // and it will be closed to be replaced by the new local file when it is used.
 func (rfs *ReleaseFileSystem) CacheRelease() error {
+	// If there is no cache path specified, create a temporary file
 	if rfs.Options.CachePath == "" {
-		return errors.New("release cache path not specified")
+		path, err := os.MkdirTemp("", "github-release-fs-")
+		if err != nil {
+			return fmt.Errorf("creating temporary cache dir: %w", err)
+		}
+		rfs.Options.CachePath = path
 	}
 
 	// Cache the release data into a JSON file
