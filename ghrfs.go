@@ -322,8 +322,8 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 
 			// Skip if extensions are defined but the file ext is not one of them
 			if len(rfs.Options.CacheExtensions) > 0 &&
-				strings.TrimPrefix(filepath.Ext(a.Name()), ".") != "" &&
-				!slices.Contains(rfs.Options.CacheExtensions, strings.TrimPrefix(filepath.Ext(a.Name()), ".")) {
+				(strings.TrimPrefix(filepath.Ext(a.Name()), ".") == "" ||
+					!slices.Contains(rfs.Options.CacheExtensions, strings.TrimPrefix(filepath.Ext(a.Name()), "."))) {
 				t.Done(nil)
 				return
 			}
