@@ -7,7 +7,7 @@ toolchain go1.24.0
 require (
 	github.com/carabiner-dev/github v0.2.2
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
