@@ -23,8 +23,11 @@ type AssetFile struct {
 // Close implements the Close method for the file. After closing, the response
 // stream is niled out to cause a re-fetch if there is another call to open/read.
 func (af *AssetFile) Close() error {
-	af.DataStream.Close() //nolint:errcheck,gosec
-	af.DataStream = nil
+	if af.DataStream != nil {
+		err := af.DataStream.Close()
+		af.DataStream = nil
+		return err
+	}
 	return nil
 }
 
