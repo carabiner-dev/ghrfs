@@ -4,8 +4,11 @@
 package ghrfs
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
+	"os"
+	"sync"
 	"time"
 )
 
@@ -15,6 +18,8 @@ var _ fs.File = (*AssetFile)(nil)
 // implements fs.File by reading data from an io.ReadCloser
 type AssetFile struct {
 	DataStream io.ReadCloser
+	mtx        sync.Mutex
+	cachePath  string
 	URL        string `json:"browser_download_url"`
 	ID         int64  `json:"id"`
 	FileInfo
@@ -32,6 +37,17 @@ func (af *AssetFile) Close() error {
 }
 
 func (af *AssetFile) Read(p []byte) (int, error) {
+	af.mtx.Lock()
+	defer af.mtx.Unlock()
+
+	if af.DataStream == nil && af.cachePath != "" {
+		f, err := os.Open(af.cachePath)
+		if err != nil {
+			return 0, fmt.Errorf("opening cached data: %w", err)
+		}
+		af.DataStream = f
+	}
+
 	return af.DataStream.Read(p)
 }
 

@@ -311,7 +311,7 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 	for _, a := range rfs.Release.Assets {
 		go func() {
 			// Check if the options have preferences for max size or extensions
-			// to cache. If unmatched, the asset will note be cached but it will
+			// to cache. If unmatched, the asset will not be cached but it will
 			// be pulled remotely if needed.
 
 			// Skip if over max size
@@ -350,6 +350,7 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 				t.Done(err)
 				return
 			}
+			a.cachePath = filepath.Join(rfs.Options.CachePath, a.Name())
 			a.DataStream.Close() //nolint:errcheck,gosec
 			a.DataStream = nil
 
