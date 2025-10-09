@@ -188,16 +188,12 @@ func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
 		}, nil
 	}
 
-	// Check if the asset file has its data stream already open
-	i, ok := rfs.Release.fileIndex[name]
-	if !ok {
+	// Validate file exists
+	if _, ok := rfs.Release.fileIndex[name]; !ok {
 		return nil, fmt.Errorf("opening %q: %w", name, fs.ErrNotExist)
 	}
-	if rfs.Release.Assets[i].DataStream != nil {
-		return rfs.Release.Assets[i], nil
-	}
 
-	// Otherwise open it
+	// Always create a new file handle
 	if rfs.Options.Cache {
 		return rfs.OpenCachedFile(name)
 	}
@@ -219,7 +215,8 @@ func (rfs *ReleaseFileSystem) OpenCachedFile(name string) (fs.File, error) {
 		return nil, fmt.Errorf("unable to open file, release cache path not set")
 	}
 
-	f, err := os.Open(filepath.Join(rfs.Options.CachePath, name))
+	cachePath := filepath.Join(rfs.Options.CachePath, name)
+	f, err := os.Open(cachePath)
 	if err != nil {
 		// If the file was not found, open the remote file
 		if errors.Is(err, os.ErrNotExist) {
@@ -228,8 +225,15 @@ func (rfs *ReleaseFileSystem) OpenCachedFile(name string) (fs.File, error) {
 		return nil, fmt.Errorf("opening cached file: %w", err)
 	}
 
-	rfs.Release.Assets[i].DataStream = f
-	return rfs.Release.Assets[i], nil
+	// Create a NEW AssetFile instance for each Open() call
+	// This ensures each caller has an independent file handle
+	return &AssetFile{
+		DataStream: f,
+		cachePath:  cachePath,
+		FileInfo:   rfs.Release.Assets[i].FileInfo,
+		URL:        rfs.Release.Assets[i].URL,
+		ID:         rfs.Release.Assets[i].ID,
+	}, nil
 }
 
 // getClientForURL returns a github client configured for the hostname
@@ -259,12 +263,15 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 		return nil, fmt.Errorf("opening %q: %w", name, fs.ErrNotExist)
 	}
 
-	if rfs.Release.Assets[i].URL == "" {
+	// Get the asset metadata
+	asset := rfs.Release.Assets[i]
+
+	if asset.URL == "" {
 		return nil, fmt.Errorf("no URL found in asset data")
 	}
 
 	// Assets are not downloaded from the API, we need a new client
-	c, err := getClientForURL(rfs.Release.Assets[i].URL)
+	c, err := getClientForURL(asset.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -272,13 +279,25 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	// Send the request to the API
 	resp, err := c.Call(
 		context.Background(), "GET",
-		rfs.Release.Assets[i].URL, nil,
+		asset.URL, nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("requesting file from API: %w", err)
+		return nil, fmt.Errorf("requesting asset %q: %w", name, err)
 	}
-	rfs.Release.Assets[i].DataStream = resp.Body
-	return rfs.Release.Assets[i], nil
+
+	if resp.StatusCode > 399 || resp.StatusCode < 200 {
+		resp.Body.Close() //nolint:errcheck,gosec
+		return nil, fmt.Errorf("HTTP error %d when getting asset %q", resp.StatusCode, name)
+	}
+
+	// Create a NEW AssetFile instance for each Open() call
+	return &AssetFile{
+		DataStream: resp.Body,
+		cachePath:  "", // No cache path for remote files
+		FileInfo:   asset.FileInfo,
+		URL:        asset.URL,
+		ID:         asset.ID,
+	}, nil
 }
 
 // CacheRelease downloads `ParallelDownloads` assets at a time and caches them
@@ -350,9 +369,8 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 				t.Done(err)
 				return
 			}
-			a.cachePath = filepath.Join(rfs.Options.CachePath, a.Name())
-			a.DataStream.Close() //nolint:errcheck,gosec
-			a.DataStream = nil
+			// Close the source file handle we opened
+			src.Close() //nolint:errcheck,gosec
 
 			t.Done(nil)
 		}()

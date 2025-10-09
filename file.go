@@ -4,10 +4,8 @@
 package ghrfs
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"sync"
 	"time"
 )
@@ -28,24 +26,25 @@ type AssetFile struct {
 // Close implements the Close method for the file. After closing, the response
 // stream is niled out to cause a re-fetch if there is another call to open/read.
 func (af *AssetFile) Close() error {
-	if af.DataStream != nil {
-		err := af.DataStream.Close()
-		af.DataStream = nil
-		return err
+	af.mtx.Lock()
+	defer af.mtx.Unlock()
+
+	if af.DataStream == nil {
+		return nil // Already closed, not an error
 	}
-	return nil
+
+	err := af.DataStream.Close()
+	af.DataStream = nil
+	return err
 }
 
 func (af *AssetFile) Read(p []byte) (int, error) {
 	af.mtx.Lock()
 	defer af.mtx.Unlock()
 
-	if af.DataStream == nil && af.cachePath != "" {
-		f, err := os.Open(af.cachePath)
-		if err != nil {
-			return 0, fmt.Errorf("opening cached data: %w", err)
-		}
-		af.DataStream = f
+	// If the stream is closed, return error
+	if af.DataStream == nil {
+		return 0, fs.ErrClosed
 	}
 
 	return af.DataStream.Read(p)
