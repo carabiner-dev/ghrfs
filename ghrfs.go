@@ -178,7 +178,7 @@ func (rfs *ReleaseFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
 // Open opens a file.
 func (rfs *ReleaseFileSystem) Open(name string) (fs.File, error) {
 	if name == "." {
-		assets := []fs.DirEntry{}
+		assets := make([]fs.DirEntry, 0, len(rfs.Release.Assets))
 		for _, f := range rfs.Release.Assets {
 			assets = append(assets, f)
 		}
