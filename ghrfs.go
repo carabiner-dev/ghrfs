@@ -46,11 +46,13 @@ func New(optFns ...optFunc) (*ReleaseFileSystem, error) {
 
 // NewWithOptions takes an options set and return a new RFS
 func NewWithOptions(opts *Options) (*ReleaseFileSystem, error) {
-	c, err := github.NewClient()
+	c, err := github.NewClient(
+		github.WithToken(opts.Token),
+		github.WithHost(opts.Host),
+	)
 	if err != nil {
 		return nil, err
 	}
-	c.Options.Host = opts.Host
 
 	rfs := &ReleaseFileSystem{
 		Options: *opts,
@@ -237,8 +239,9 @@ func (rfs *ReleaseFileSystem) OpenCachedFile(name string) (fs.File, error) {
 }
 
 // getClientForURL returns a github client configured for the hostname
-// of a URL.
-func getClientForURL(urlString string) (*github.Client, error) {
+// of a URL. The token authenticates the request, which is required to
+// download assets from private releases.
+func getClientForURL(urlString, token string) (*github.Client, error) {
 	// The download URL from the assets is not on the same host as
 	// the API, so we need a new client
 	u, err := url.Parse(urlString)
@@ -248,6 +251,7 @@ func getClientForURL(urlString string) (*github.Client, error) {
 
 	// Request the file using a client with the asset URL
 	c, err := github.NewClient(
+		github.WithToken(token),
 		github.WithHost(u.Hostname()),
 	)
 	if err != nil {
@@ -271,7 +275,7 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	}
 
 	// Assets are not downloaded from the API, we need a new client
-	c, err := getClientForURL(asset.URL)
+	c, err := getClientForURL(asset.URL, rfs.Options.Token)
 	if err != nil {
 		return nil, err
 	}

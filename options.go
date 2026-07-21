@@ -22,6 +22,11 @@ type Options struct {
 	CacheMaxSize      int64
 	CacheExtensions   []string
 	Tag               string
+	// Token is an access token used to authenticate against the GitHub API
+	// and to download release assets. It is required to read from private
+	// releases. When empty, the underlying GitHub client falls back to the
+	// GITHUB_TOKEN environment variable.
+	Token string
 }
 
 // Default options
@@ -69,6 +74,17 @@ func FromURL(urlString string) optFunc {
 func WithHost(hostname string) optFunc {
 	return func(opts *Options) error {
 		opts.Host = hostname
+		return nil
+	}
+}
+
+// WithToken sets an explicit access token used to authenticate against the
+// GitHub API and to download release assets. It is required to read from
+// private releases. When left unset, the underlying GitHub client falls back
+// to the GITHUB_TOKEN environment variable.
+func WithToken(token string) optFunc {
+	return func(opts *Options) error {
+		opts.Token = token
 		return nil
 	}
 }
