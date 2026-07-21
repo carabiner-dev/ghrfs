@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,6 +32,11 @@ const (
 	releaseURLMask  = `repos/%s/%s/releases/tags/%s`
 	githubAPIURL    = "api.github.com"
 	releaseDataFile = ".release-data.json"
+
+	// retryInitialWait is the backoff before the first retry; it doubles on
+	// each subsequent attempt up to retryMaxWait.
+	retryInitialWait = 500 * time.Millisecond
+	retryMaxWait     = 30 * time.Second
 )
 
 func New(optFns ...optFunc) (*ReleaseFileSystem, error) {
@@ -55,8 +61,9 @@ func NewWithOptions(opts *Options) (*ReleaseFileSystem, error) {
 	}
 
 	rfs := &ReleaseFileSystem{
-		Options: *opts,
-		client:  c,
+		Options:   *opts,
+		client:    c,
+		retryWait: retryInitialWait,
 	}
 
 	if err := rfs.LoadRelease(); err != nil {
@@ -75,9 +82,10 @@ var (
 
 // ReleaseFileSystem implements fs.FS by reading data a GitHub release.
 type ReleaseFileSystem struct {
-	Options Options
-	Release ReleaseData
-	client  *github.Client
+	Options   Options
+	Release   ReleaseData
+	client    *github.Client
+	retryWait time.Duration
 }
 
 // ReleaseData captures the release information from github
@@ -108,12 +116,7 @@ func (rfs *ReleaseFileSystem) LoadRelease() error {
 	}
 
 	// Call the API to get the data
-	resp, err := rfs.client.Call(
-		context.Background(), "GET", releaseURL, nil,
-	)
-	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		return fmt.Errorf("HTTP error %d when getting release data", resp.StatusCode)
-	}
+	resp, err := rfs.getWithRetry(context.Background(), rfs.client, releaseURL)
 	if err != nil {
 		return fmt.Errorf("loading release: %w", err)
 	}
@@ -260,6 +263,51 @@ func getClientForURL(urlString, token string) (*github.Client, error) {
 	return c, nil
 }
 
+// getWithRetry issues an authenticated GET, retrying transient failures
+// (network errors and HTTP 429 or 5xx responses) with exponential backoff up
+// to Options.Retries additional attempts. Client errors (4xx other than 429)
+// are returned immediately. On success the response is returned with its body
+// open; the caller is responsible for closing it.
+func (rfs *ReleaseFileSystem) getWithRetry(ctx context.Context, client *github.Client, reqURL string) (*http.Response, error) {
+	wait := rfs.retryWait
+	if wait <= 0 {
+		wait = retryInitialWait
+	}
+
+	for attempt := uint(0); ; attempt++ {
+		resp, err := client.Call(ctx, http.MethodGet, reqURL, nil)
+		if err == nil {
+			return resp, nil
+		}
+
+		// A response carrying a 4xx status (other than 429) is a permanent
+		// client error and must not be retried.
+		if resp != nil {
+			retryable := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+			resp.Body.Close() //nolint:errcheck,gosec
+			if !retryable {
+				return nil, err
+			}
+		}
+
+		if attempt >= rfs.Options.Retries {
+			return nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+		if wait < retryMaxWait {
+			wait *= 2
+			if wait > retryMaxWait {
+				wait = retryMaxWait
+			}
+		}
+	}
+}
+
 // OpenRemoteFile returns the asset file connected to its data stream
 func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 	i, ok := rfs.Release.fileIndex[name]
@@ -280,18 +328,11 @@ func (rfs *ReleaseFileSystem) OpenRemoteFile(name string) (fs.File, error) {
 		return nil, err
 	}
 
-	// Send the request to the API
-	resp, err := c.Call(
-		context.Background(), "GET",
-		asset.URL, nil,
-	)
+	// Send the request to fetch the asset. The body is handed to the returned
+	// AssetFile's DataStream and closed by the caller via AssetFile.Close.
+	resp, err := rfs.getWithRetry(context.Background(), c, asset.URL) //nolint:bodyclose
 	if err != nil {
 		return nil, fmt.Errorf("requesting asset %q: %w", name, err)
-	}
-
-	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		resp.Body.Close() //nolint:errcheck,gosec
-		return nil, fmt.Errorf("HTTP error %d when getting asset %q", resp.StatusCode, name)
 	}
 
 	// Create a NEW AssetFile instance for each Open() call

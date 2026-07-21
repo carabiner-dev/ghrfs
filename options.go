@@ -27,6 +27,10 @@ type Options struct {
 	// releases. When empty, the underlying GitHub client falls back to the
 	// GITHUB_TOKEN environment variable.
 	Token string
+	// Retries is the number of additional attempts (with exponential backoff)
+	// made when a release or asset request fails with a transient error
+	// (a network error, or HTTP 429 or 5xx). Zero disables retries.
+	Retries uint
 }
 
 // Default options
@@ -34,6 +38,7 @@ var defaultOptions = Options{
 	Host:              githubAPIURL,
 	Cache:             false,
 	ParallelDownloads: 3,
+	Retries:           3,
 }
 
 const releasePathPattern = `/([A-Za-z0-9-_\.]+)/([A-Za-z0-9-_\.]+)/releases/tag/(\S+)`
@@ -85,6 +90,16 @@ func WithHost(hostname string) optFunc {
 func WithToken(token string) optFunc {
 	return func(opts *Options) error {
 		opts.Token = token
+		return nil
+	}
+}
+
+// WithRetries sets how many additional attempts are made (with exponential
+// backoff) when fetching release data or an asset fails with a transient error
+// (a network error, or HTTP 429 or 5xx). Zero disables retries.
+func WithRetries(retries uint) optFunc {
+	return func(opts *Options) error {
+		opts.Retries = retries
 		return nil
 	}
 }
