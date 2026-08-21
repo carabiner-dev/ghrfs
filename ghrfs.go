@@ -371,7 +371,7 @@ func (rfs *ReleaseFileSystem) CacheRelease() error {
 	}
 
 	// Now copy the file data to the local cache
-	t := throttler.New((rfs.Options.ParallelDownloads), len(rfs.Release.Assets))
+	t := throttler.New(rfs.Options.ParallelDownloads, len(rfs.Release.Assets))
 	for _, a := range rfs.Release.Assets {
 		go func() {
 			// Check if the options have preferences for max size or extensions
