@@ -4,6 +4,7 @@
 package ghrfs
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -38,5 +39,30 @@ func TestFromURL(t *testing.T) {
 			require.Equal(t, tc.expect.Organization, o.Organization)
 			require.Equal(t, tc.expect.Organization, o.Organization)
 		})
+	}
+}
+
+// The options of several file systems are built at once, by anything that
+// reads more than one release at a time. Run with -race, this is where a
+// pattern compiled on first use showed: every caller tested and assigned it.
+func TestFromURLIsSafeForConcurrentUse(t *testing.T) {
+	t.Parallel()
+	const workers = 16
+	errs := make(chan error, workers)
+	start := make(chan struct{})
+	for range workers {
+		go func() {
+			<-start
+			o := Options{}
+			err := FromURL("https://github.com/protobom/cel/releases/tag/v0.5.0")(&o)
+			if err == nil && (o.Organization != "protobom" || o.Repository != "cel" || o.Tag != "v0.5.0") {
+				err = fmt.Errorf("options read from the URL: %+v", o)
+			}
+			errs <- err
+		}()
+	}
+	close(start)
+	for range workers {
+		require.NoError(t, <-errs)
 	}
 }

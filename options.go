@@ -43,7 +43,10 @@ var defaultOptions = Options{
 
 const releasePathPattern = `/([A-Za-z0-9-_\.]+)/([A-Za-z0-9-_\.]+)/releases/tag/(\S+)`
 
-var releasePathRegex *regexp.Regexp
+// releasePathRegex is compiled when the package loads, not on first use: the
+// options of two file systems may be built at once, and a pattern compiled
+// on demand was tested and assigned by both without a lock.
+var releasePathRegex = regexp.MustCompile(releasePathPattern)
 
 // FromURL intializaes thew options set from a github release URL
 func FromURL(urlString string) optFunc {
@@ -51,10 +54,6 @@ func FromURL(urlString string) optFunc {
 		u, err := url.Parse(urlString)
 		if err != nil {
 			return err
-		}
-
-		if releasePathRegex == nil {
-			releasePathRegex = regexp.MustCompile(releasePathPattern)
 		}
 
 		pts := releasePathRegex.FindStringSubmatch(u.Path)
